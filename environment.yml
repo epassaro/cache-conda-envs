@@ -1,0 +1,14 @@
+name: my-env
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python >=3.8
+  - pip
+  - numpy <=1.19
+  - scipy
+  - pandas
+  - matplotlib-base
+  - jupyter
+  - pytest =6
