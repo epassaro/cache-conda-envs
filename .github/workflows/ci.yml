@@ -1,40 +1,34 @@
-name: ci
-
+name: Unit tests
 on:
-  push:
-    branches:
-      - '*'
-
   pull_request:
-    branches:
-      - '*'
-
-  schedule:
-    - cron: '0 0 * * *'
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled'
+        required: false
+        default: false
 
 env:
   CACHE_NUMBER: 0  # increase to reset cache manually
 
 jobs:
   build:
-
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            label: linux-64
-            prefix: /usr/share/miniconda3/envs/my-env
+        # compiler: [gcc-9, gcc-10, clang-10, clang-11, clang-12]
+        compiler: [gcc-10]
+        prefix: /usr/share/miniconda3/envs/my-env
+      fail-fast: false
 
-          - os: macos-latest
-            label: osx-64
-            prefix: /Users/runner/miniconda3/envs/my-env
-
-          - os: windows-latest
-            label: win-64
-            prefix: C:\Miniconda3\envs\my-env
-
-    name: ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.compiler }}
     steps:
       - uses: actions/checkout@v2
 
@@ -52,13 +46,28 @@ jobs:
       - uses: actions/cache@v2
         with:
           path: ${{ matrix.prefix }}
-          key: ${{ matrix.label }}-conda-${{ hashFiles('environment.yml') }}-${{ env.DATE }}-${{ env.CACHE_NUMBER }}
+          key: linux-64-conda-${{ hashFiles('environment.yml') }}-${{ env.DATE }}-${{ env.CACHE_NUMBER }}
         id: cache
 
       - name: Update environment
         run: mamba env update -n my-env -f environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
-      - name: Run tests
-        shell: bash -l {0}
-        run: pytest ./tests
+      - name: Build libnomp
+        id: build_libnomp
+        run: |
+          echo "NOMP_INSTALL_DIR=${PWD}/install" >> $GITHUB_ENV
+          mkdir -p ${BUILDDIR}
+          cd ${BUILDDIR}
+          cmake -DCMAKE_INSTALL_PREFIX=../install \
+            -DOpenCL_LIBRARY=${CONDA_PREFIX}/lib/libOpenCL.so \
+            -DOpenCL_INCLUDE_DIR=${CONDA_PREFIX}/include ..
+          make install
+      - name: Run libnomp tests
+        id: run_libnomp
+        run: |
+          cd ${TESTDIR}
+          ./run-tests.sh
+      - name: Block to allow inspecting failures
+        run: sleep 30m
+        if: ${{ failure() && inputs.debug_enabled }}

@@ -1,14 +1,6 @@
-name: my-env
-
-channels:
-  - conda-forge
-
+name: libnomp
 dependencies:
-  - python >=3.8
+  - python=3.10
   - pip
-  - numpy <=1.19
-  - scipy
-  - pandas
-  - matplotlib-base
-  - jupyter
-  - pytest =6
+  - pip:
+    - -r requirements.txt
